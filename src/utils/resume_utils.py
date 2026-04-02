@@ -155,3 +155,101 @@ def resume_checkpoint(model, optimizer, lr_scheduler, checkpoint_path, device, c
     print(f"{'='*60}\n")
     
     return epoch, best_val_loss, earlystop_count
+
+
+def check_for_existing_checkpoints(logs_dir, checkpoints_dir, saved_fn):
+    """
+    Check if logs and checkpoints exist for the given model.
+    This helps determine if training should be resumed or started fresh.
+    
+    Args:
+        logs_dir (str): Path to logs directory
+        checkpoints_dir (str): Path to checkpoints directory
+        saved_fn (str): Base filename for checkpoints
+    
+    Returns:
+        dict: Contains:
+            - 'has_logs': bool - Whether logs directory has content
+            - 'has_checkpoints': bool - Whether checkpoints exist
+            - 'checkpoint_path': str or None - Path to latest checkpoint if exists
+            - 'num_checkpoints': int - Number of checkpoints found
+            - 'latest_epoch': int - Latest epoch from checkpoints, or -1 if none
+    """
+    result = {
+        'has_logs': False,
+        'has_checkpoints': False,
+        'checkpoint_path': None,
+        'num_checkpoints': 0,
+        'latest_epoch': -1,
+    }
+    
+    # Check for existing logs
+    if os.path.exists(logs_dir):
+        log_files = [f for f in os.listdir(logs_dir) if f.endswith('.log') or f.endswith('.txt')]
+        if log_files:
+            result['has_logs'] = True
+    
+    # Check for existing checkpoints
+    if os.path.exists(checkpoints_dir):
+        checkpoint_files = [f for f in os.listdir(checkpoints_dir) if f.endswith('.pth')]
+        result['num_checkpoints'] = len(checkpoint_files)
+        
+        if checkpoint_files:
+            result['has_checkpoints'] = True
+            
+            # Find the latest checkpoint
+            checkpoint_path = get_checkpoint_path(checkpoints_dir, saved_fn, resume_from=None)
+            if checkpoint_path:
+                result['checkpoint_path'] = checkpoint_path
+                
+                # Extract epoch number
+                try:
+                    epoch_str = os.path.basename(checkpoint_path).split('_epoch_')[-1].replace('.pth', '')
+                    result['latest_epoch'] = int(epoch_str)
+                except (ValueError, IndexError):
+                    if '_best' in os.path.basename(checkpoint_path):
+                        result['latest_epoch'] = 0  # Best checkpoint, epoch unknown
+    
+    return result
+
+
+def should_resume_training(logs_dir, checkpoints_dir, saved_fn):
+    """
+    Determine if training should be resumed based on existing logs and checkpoints.
+    
+    Args:
+        logs_dir (str): Path to logs directory
+        checkpoints_dir (str): Path to checkpoints directory
+        saved_fn (str): Base filename for checkpoints
+    
+    Returns:
+        tuple: (should_resume: bool, checkpoint_path: str or None, info_message: str)
+    """
+    check_result = check_for_existing_checkpoints(logs_dir, checkpoints_dir, saved_fn)
+    
+    should_resume = check_result['has_checkpoints']
+    checkpoint_path = check_result['checkpoint_path']
+    
+    # Create informative message
+    message = "\n" + "="*70 + "\n"
+    message += "CHECKPOINT DETECTION REPORT\n"
+    message += "="*70 + "\n"
+    
+    if check_result['has_logs']:
+        message += f"✓ Existing logs found in: {logs_dir}\n"
+    else:
+        message += f"✗ No existing logs found\n"
+    
+    if check_result['has_checkpoints']:
+        message += f"✓ Found {check_result['num_checkpoints']} checkpoint(s)\n"
+        if check_result['latest_epoch'] >= 0:
+            message += f"✓ Latest epoch: {check_result['latest_epoch']}\n"
+        if checkpoint_path:
+            message += f"✓ Will resume from: {os.path.basename(checkpoint_path)}\n"
+    else:
+        message += f"✗ No checkpoints found\n"
+        message += "→ Starting training from scratch\n"
+    
+    message += "="*70 + "\n"
+    
+    return should_resume, checkpoint_path, message

@@ -14,7 +14,7 @@ from losses_metrics import Losses,TTLosses,Metrics, TTMetrics
 from config.config import parse_configs
 from utils.logger import Logger
 from utils.train_utils import create_optimizer, create_lr_scheduler, get_saved_state, save_checkpoint, reduce_tensor, to_python_float, print_nvidia_driver_version
-from utils.resume_utils import get_checkpoint_path, resume_checkpoint
+from utils.resume_utils import get_checkpoint_path, resume_checkpoint, should_resume_training
 from utils.misc import AverageMeter, ProgressMeter, print_gpu_memory_usage
 from data_process.dataloader import  create_occlusion_train_val_dataloader, create_occlusion_test_dataloader
 from torch.utils.tensorboard import SummaryWriter
@@ -50,6 +50,22 @@ def main():
 
     configs.distributed = configs.world_size > 1 or configs.multiprocessing_distributed
 
+    # Automatic checkpoint detection: Check if logs and checkpoints exist
+    rank = int(os.environ.get("RANK", 0))
+    if rank == 0:  # Only master process checks and prints
+        should_resume, checkpoint_path, detection_message = should_resume_training(
+            configs.logs_dir, 
+            configs.checkpoints_dir, 
+            configs.saved_fn
+        )
+        print(detection_message)
+        
+        # Automatically enable resume if checkpoints are found
+        if should_resume and not configs.resume:
+            print("→ Auto-enabling resume mode due to existing checkpoints...\n")
+            configs.resume = True
+            configs.resume_from = None  # Will use latest checkpoint
+    
     main_worker(configs)
 
 
