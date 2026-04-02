@@ -14,6 +14,7 @@ from losses_metrics import Losses,TTLosses,Metrics, TTMetrics
 from config.config import parse_configs
 from utils.logger import Logger
 from utils.train_utils import create_optimizer, create_lr_scheduler, get_saved_state, save_checkpoint, reduce_tensor, to_python_float, print_nvidia_driver_version
+from utils.resume_utils import get_checkpoint_path, resume_checkpoint
 from utils.misc import AverageMeter, ProgressMeter, print_gpu_memory_usage
 from data_process.dataloader import  create_occlusion_train_val_dataloader, create_occlusion_test_dataloader
 from torch.utils.tensorboard import SummaryWriter
@@ -114,6 +115,20 @@ def main_worker(configs):
 
     loss_func = Losses(configs=configs, loss_type=configs.loss_function, device=configs.device)
     
+    # Handle checkpoint resume
+    if configs.resume:
+        checkpoint_path = get_checkpoint_path(configs.checkpoints_dir, configs.saved_fn, configs.resume_from)
+        if checkpoint_path is not None:
+            resume_epoch, best_val_loss, earlystop_count = resume_checkpoint(
+                model, optimizer, lr_scheduler, checkpoint_path, configs.device, configs
+            )
+            configs.start_epoch = resume_epoch + 1
+            if logger is not None:
+                logger.info(f'Resumed from checkpoint: {checkpoint_path}')
+                logger.info(f'Continuing training from epoch {configs.start_epoch}')
+        else:
+            if logger is not None:
+                logger.warning('Resume requested but no checkpoint found. Starting from epoch 1.')
 
     if configs.is_master_node:
         num_parameters = get_num_parameters(model)

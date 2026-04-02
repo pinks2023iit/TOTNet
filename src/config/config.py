@@ -42,6 +42,10 @@ def parse_configs():
                         help='If true, the image of testing phase will be saved')
     parser.add_argument('--pretrained_path', type=str, default=None, metavar='PATH',
                         help='the path of the pretrained checkpoint')
+    parser.add_argument('--resume', action='store_true',
+                        help='Resume training from the latest checkpoint in the checkpoint directory')
+    parser.add_argument('--resume_from', type=str, default=None, metavar='PATH',
+                        help='Resume from a specific checkpoint. Can be "best" for best checkpoint, "epoch_X" for specific epoch, or a checkpoint filename')
     ### build backbone network
     parser.add_argument('--backbone_choice', type=str, default="single",
                         help="single means single feature map, multi for multi level feature map")
