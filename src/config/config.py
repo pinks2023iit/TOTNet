@@ -210,7 +210,7 @@ def parse_configs():
     ###################################################################
     ##############          Tennis dataset
     ####################
-    configs.tennis_dataset_dir = os.path.join('/home/s224705071/github/PhysicsInformedDeformableAttentionNetwork/data/', 'tennis_data')
+    configs.tennis_dataset_dir = os.path.join('/workspace/awadh/nvidia/TOTNet/data/tennis_data')
     configs.tennis_train_game_list = ['game1', 'game2', 'game3', 'game4', 'game5', 'game6', 'game7', 'game8']
     configs.tennis_test_game_list = ['game9', 'game10']
 

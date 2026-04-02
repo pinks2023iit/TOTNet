@@ -98,7 +98,9 @@ def reduce_tensor(tensor, world_size):
     return rt
 
 def to_python_float(t):
-    if hasattr(t, 'item'):
+    if isinstance(t, float):
+        return t
+    elif hasattr(t, 'item'):
         return t.item()
     else:
         return t[0]

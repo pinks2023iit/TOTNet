@@ -45,7 +45,7 @@ def main():
                       'disable data parallelism.')
 
     if configs.dist_url == "env://" and configs.world_size == -1:
-        configs.world_size = int(os.environ["WORLD_SIZE"])
+        configs.world_size = int(os.environ.get("WORLD_SIZE", 1))
 
     configs.distributed = configs.world_size > 1 or configs.multiprocessing_distributed
 
@@ -55,10 +55,10 @@ def main():
 
 def main_worker(configs):
 
-    configs.rank = int(os.environ["RANK"])
-    configs.world_size = int(os.environ["WORLD_SIZE"])
+    configs.rank = int(os.environ.get("RANK", 0))
+    configs.world_size = int(os.environ.get("WORLD_SIZE", 1))
     # Set the GPU for this process
-    configs.gpu_idx = int(os.environ["LOCAL_RANK"])  # Rank within the current node
+    configs.gpu_idx = int(os.environ.get("LOCAL_RANK", 0))  # Rank within the current node
     configs.device = torch.device(f'cuda:{configs.gpu_idx}')
 
     print(f"Running on rank {configs.rank}, using GPU {configs.gpu_idx}")
@@ -107,7 +107,7 @@ def main_worker(configs):
 
     optimizer = create_optimizer(configs, model)
     lr_scheduler = create_lr_scheduler(optimizer, configs)
-    scaler = torch.amp.GradScaler()
+    scaler = torch.cuda.amp.GradScaler()
     best_val_loss = np.inf
     earlystop_count = 0
     is_best = False
@@ -245,7 +245,7 @@ def train_one_epoch(train_loader, model, optimizer, loss_func, scaler, epoch, co
             # Reshape to combine frames into the channel dimension
             batch_data = batch_data.view(B, N * C, H, W)  # Shape: [B, N*C, H, W]
 
-        with torch.autocast(device_type='cuda'):
+        with torch.cuda.amp.autocast():
             output_heatmap = model(batch_data) # output in shape [B,H,W],if TTNet, output is ([B,W], [B,H])
             output_heatmap = output_heatmap.float()
 
@@ -313,7 +313,7 @@ def evaluate_one_epoch(val_loader, model, loss_func, epoch, configs, logger):
                 # Reshape to combine frames into the channel dimension
                 batch_data = batch_data.view(B, N * C, H, W)  # Shape: [B, N*C, H, W]
 
-            with torch.autocast(device_type='cuda'):
+            with torch.cuda.amp.autocast():
                 output_heatmap = model(batch_data) # output in shape ([B, H, W]) if output heatmap, just raw logits
                 output_heatmap = output_heatmap.float()
 
