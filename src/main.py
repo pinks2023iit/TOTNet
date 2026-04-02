@@ -15,6 +15,7 @@ from config.config import parse_configs
 from utils.logger import Logger
 from utils.train_utils import create_optimizer, create_lr_scheduler, get_saved_state, save_checkpoint, reduce_tensor, to_python_float, print_nvidia_driver_version
 from utils.resume_utils import get_checkpoint_path, resume_checkpoint, should_resume_training
+from utils.checkpoint_validator import validate_checkpoint_sequence
 from utils.misc import AverageMeter, ProgressMeter, print_gpu_memory_usage
 from data_process.dataloader import  create_occlusion_train_val_dataloader, create_occlusion_test_dataloader
 from torch.utils.tensorboard import SummaryWriter
@@ -131,9 +132,27 @@ def main_worker(configs):
 
     loss_func = Losses(configs=configs, loss_type=configs.loss_function, device=configs.device)
     
-    # Handle checkpoint resume
+    # Handle checkpoint resume with validation
     if configs.resume:
-        checkpoint_path = get_checkpoint_path(configs.checkpoints_dir, configs.saved_fn, configs.resume_from)
+        # Validate checkpoint sequence to detect interrupted training
+        validation_result = validate_checkpoint_sequence(
+            configs.checkpoints_dir, 
+            configs.saved_fn,
+            max_time_gap_minutes=60  # Flag if gap > 1 hour between checkpoints
+        )
+        
+        if validation_result['warning']:
+            print(f"\n⚠ WARNING: {validation_result['warning']}\n")
+            if logger is not None:
+                logger.warning(validation_result['warning'])
+        
+        # Get safe checkpoint path
+        if validation_result['is_valid']:
+            checkpoint_path = validation_result['valid_checkpoint_path']
+        else:
+            # Fall back to regular get_checkpoint_path
+            checkpoint_path = get_checkpoint_path(configs.checkpoints_dir, configs.saved_fn, configs.resume_from)
+        
         if checkpoint_path is not None:
             resume_epoch, best_val_loss, earlystop_count = resume_checkpoint(
                 model, optimizer, lr_scheduler, checkpoint_path, configs.device, configs

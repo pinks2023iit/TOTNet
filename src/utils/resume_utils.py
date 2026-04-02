@@ -4,6 +4,7 @@ Utility functions for resuming training from checkpoints.
 
 import os
 import torch
+import time
 
 
 def get_checkpoint_path(checkpoints_dir, saved_fn, resume_from=None):
